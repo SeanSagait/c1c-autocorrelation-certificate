@@ -54,7 +54,7 @@ teorth/optimizationproblems#344.
 
 Values at K = 2^20 ... 2^24: 0.410378000, 0.410378098, 0.410378147, 0.410378171, 0.410378183
 (each built from the previous one as a warm start). The gains halve with each doubling, i.e.
-O(1/K); extrapolating, this family tends to about 0.41037818.
+O(1/K); extrapolating, this family tends to about 0.4103782.
 
 `construction/` also has the earlier builds (geometric spike over m cells kept within int64,
 K = 262144 and K = 524288).
