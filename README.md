@@ -1,61 +1,84 @@
-# Lower bound C_1c >= 0.41037819
+# Lower bound C_1c >= 0.410378195
 
-Step-function certificate for the Barnard–Steinerberger autocorrelation constant
+Certificates for the Barnard–Steinerberger autocorrelation constant
 ([C_1c](https://teorth.github.io/optimizationproblems/constants/1c.html)).
 
 ## Claim
 
-    C_1c >= 556819001148976469436453982568448 / 1356843543666599174141709917152655 = 0.410378192642818...
+    C_1c >= 0.410378195722515456620959705443384843306...
 
-## Certificate
+The exact rational is the field `bound` of `pwcert_p20_dps40_S120.json` (55 kB).
 
-`K67108864_0.41037819.txt.xz` (xz-compressed, 68 MB; 661 MB unpacked): first number
-K = 67108864 = 2^26, then 67108865 non-negative integer weights. The function is f = w_i on [i/K, (i+1)/K), so the support is [0, (K+1)/K).
+## Certificate (piecewise polynomial)
 
-For equal steps, t -> ∫ f(x) f(x+t) dx is linear between multiples of 1/K
-(Kravitz, arXiv:2004.06611, proof of Thm 3.1), so
+All numbers in the JSON are exact rationals (strings). The function is
 
-    min_{0<=t<=1} ∫ f(x)f(x+t) dx / (∫ f)^2 = K * min_{0<=k<=K} a_k / S^2,
-    a_k = sum_i w_i w_{i+k},  S = sum_i w_i.
+    f = (1/s) 1_[-s/2, s/2) + h,    s = 2^-120,
 
-Here S = 718053303448502830, the minimum is a_k = 3152954882928893840102143785 at k = 56303821.
+where h = 0 below t1, h(x) = sum_k c_k (x - lo)^k on each piece [lo, hi) listed in `pieces`, and h = 0 beyond the
+last piece. There are 11 pieces: 9 polynomials of degree 20 between the breakpoints
+{t1, 1 - 5 t1, ..., 1 - t1} (t1 = 22545746012851/2^47 ≈ 0.160197), then the constant T on [1 - t1, 1) and on
+[1, 1 + s/2).
+
+Since f is piecewise polynomial with rational data, g(t) = ∫ f(x) f(x+t) dx is a polynomial with rational coefficients
+on each piece of the lag mesh, of degree at most 41, and can be computed exactly. The certificate states
+
+    min_{0<=t<=1} g(t) >= m' = T - margin,    ∫ f = 1 + M,
+
+so C_1c >= m' / (1 + M)^2 = `bound`. In fact g >= T on [0, 1], with g = T exactly on [1 - t1, 1].
 
 ## Verify
 
-    xz -dk K67108864_0.41037819.txt.xz
     sha256sum -c SHA256SUMS
-    python verify_lean.py K67108864_0.41037819.txt      # ~16 min, ~15 GB RAM
-    python verify_twopass.py K67108864_0.41037819.txt   # ~12 min, ~15 GB RAM
+    python verify_pwcert_independent.py pwcert_p20_dps40_S120.json   # ~1 min
+    python verify_pwcert.py pwcert_p20_dps40_S120.json               # ~15 min
 
-(times on a 12-core cloud machine). The weights go up to 2^58, past the int64 products of
-`verify.py`. Both verifiers split each weight into 8- or 9-bit limbs; every limb correlation is an
-integer below 2^52, so a float64 FFT gives it to within 0.25 (checked; the largest distance seen is
-0.004), and the exact integers are recombined in Python. They then differ:
+Both verifiers use exact rational arithmetic (Python `Fraction`) for everything that matters and check f >= 0
+(Bernstein coefficients per piece), M and `bound`, and g >= m' on [0, 1] (exact Bernstein subdivision on every
+lag piece). They compute g differently:
 
-- `verify_lean.py` assembles every a_k exactly and takes the minimum.
-- `verify_twopass.py` first finds every lag within a relative 1e-12 of the smallest (the float
-  error is below 1e-14), then rebuilds those lags exactly.
-
-Both check S, a_0 and the deciding lag by direct summation in Python integers, and both give the
-fraction above. `verify_ntt.py` (no floating point) and `verify_limbs.py` do the same job but need
-more memory at this size; `verify.py` and `verify_independent.py` are kept for smaller certificates.
+- `verify_pwcert_independent.py` builds g on each lag piece from exact bivariate antiderivatives, and checks that g is
+  continuous, that g(0) = ∫ f^2, that 2 ∫ g = (∫ f)^2, and that g vanishes at the end of the support. It was written from
+  this description only, without reading `verify_pwcert.py` or the construction.
+- `verify_pwcert.py` integrates f(x) f(x+t) exactly at 2p+3 rational lags per piece, interpolates, checks the degree,
+  and adds a floating-point FFT sanity check.
 
 ## Construction (not needed for validity)
 
-Near-optimal functions have a spike at the left end carrying about 40% of the mass, then f = 0
-on (0, t1) with t1 ≈ 0.160, then a nearly flat profile up to x ≈ 1. With every shift in
-[t1, 1] active, the weights satisfy spike * w_k + sum_{i>=1} w_i w_{i+k} = T for all k.
+Near-optimal functions have a spike at the left end carrying about 40% of the mass, then f = 0 on (0, t1),
+then a nearly flat profile up to x ≈ 1. With every shift in [t1, 1] active, the profile solves
+a h(t) + (h ⋆ h)(t) = T on (t1, 1]. Its solution is analytic between the breakpoints {k t1} ∪ {1 - k t1}.
 
-The spike is a single cell. The system is solved in floating point by an Anderson-accelerated
-fixed point, each K warm-started from K/2 (`construction/lean.py`, about 20 FFT steps per level),
-then every weight is rounded at scale 2^58. Rounding at 2^52, as in the earlier K = 2^24
-certificate, costs about 4e-10; at 2^58 the cost is about 1e-11. The single-cell spike with
-big-integer weights follows arhancanli's update of teorth/optimizationproblems#344.
+`construction/cont.py` and `construction/contmp.py` solve this equation by piecewise Chebyshev collocation, in double
+and in mpmath precision, and maximise over t1. The limit value is 0.41037819572251545662... `construction/pwcert.py`
+converts the 40-digit solution to rational polynomials of degree 20 on each piece, takes a dyadic t1 and a box of width
+2^-120 for the spike, and certifies the result exactly (`python pwcert.py 40 20 120 --rb 140`, about 6 min).
+It is warm-started from the float weights of a K = 2^22 step solution, saved as `K4194304.npy` (from `construction/lean.py`).
 
-Values at K = 2^20 ... 2^26: 0.410378000, 0.410378098, 0.410378147, 0.410378171, 0.410378183,
-0.410378190, 0.410378193. The continuum limit of this family is 0.41037819572 (computed directly,
-piecewise on the breakpoints of the profile), and K (limit - value) ≈ 0.2052, i.e. half the limit,
-so the K = 2^26 value is within 3.1e-9 of it.
+The certificate matches the continuum limit of this family to 31 digits. The only loss is from rounding t1 to a dyadic
+rational (about 4e-32).
 
-`construction/` also has the earlier builds (`one.py`; geometric spike over m cells kept within
-int64, K = 262144 and K = 524288).
+## Earlier step-function certificate
+
+`K67108864_0.41037819.txt.xz` (xz-compressed, 68 MB; 661 MB unpacked): first number K = 2^26, then K + 1
+non-negative integer weights, f = w_i on [i/K, (i+1)/K). For equal steps, t -> ∫ f(x) f(x+t) dx is linear between
+multiples of 1/K (Kravitz, arXiv:2004.06611, proof of Thm 3.1), so the value is K min_k a_k / S^2 with
+a_k = sum_i w_i w_{i+k} and S = sum_i w_i. It gives
+
+    C_1c >= 556819001148976469436453982568448 / 1356843543666599174141709917152655 = 0.410378192642818...
+
+(S = 718053303448502830, minimum at k = 56303821).
+
+    xz -dk K67108864_0.41037819.txt.xz
+    python verify_lean.py K67108864_0.41037819.txt      # ~16 min, ~15 GB RAM
+    python verify_twopass.py K67108864_0.41037819.txt   # ~12 min, ~15 GB RAM
+
+Both split the weights (up to 2^58) into 8- or 9-bit limbs, so every limb correlation is an integer below 2^52 that
+comes out of a float64 FFT within 0.25 (largest distance seen: 0.004), and recombine the limbs exactly in Python
+integers. `verify_ntt.py`, `verify_limbs.py`, `verify.py` and `verify_independent.py` are kept for smaller
+certificates.
+
+Step functions lose about C/(2K) to the continuum: values at K = 2^20 ... 2^26 are 0.410378000, 0.410378098,
+0.410378147, 0.410378171, 0.410378183, 0.410378190, 0.410378193. The single-cell spike with big-integer weights
+follows arhancanli's update of teorth/optimizationproblems#344. `construction/` also has the earlier step-function
+builds (`one.py`, `lean.py`).
