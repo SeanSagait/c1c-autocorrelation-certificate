@@ -25,7 +25,8 @@ on each piece of the lag mesh, of degree at most 41, and can be computed exactly
 
     min_{0<=t<=1} g(t) >= m' = T - margin,    ∫ f = 1 + M,
 
-so C_1c >= m' / (1 + M)^2 = `bound`. In fact g >= T on [0, 1], with g = T exactly on [1 - t1, 1].
+so C_1c >= m' / (1 + M)^2 = `bound`. In fact g >= T on [0, 1], with g = T exactly on [1 - t1 + s/2, 1]
+(at 1 - t1 itself, g - T = 4.17e-71 > 0; thanks to chessing234 for the correction).
 
 ## Verify
 
